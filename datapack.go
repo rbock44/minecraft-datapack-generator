@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -45,12 +46,33 @@ func (d *datapack) functionsPath() string {
 	return filepath.Join(d.targetPath(), d.FunctionRoot)
 }
 
-func (d *datapack) addFunction(name, namespace, content string) {
-	f := newFunction(name, namespace, content)
+func (d *datapack) newFunction(n functionName, ns namespace) *function {
+	f := newFunction(n, ns)
+	fmt.Printf("%#v %#v\n", d, f)
 	d.Functions = append(d.Functions, f)
+	return f
 }
 
-func (d *datapack) addTag(name, content string) {
+func (d *datapack) addLoadTag(function string) {
+	name := "load"
+	content := strings.Replace(`{
+  "values": [
+    "{{function}}"
+  ]
+}
+`, "{{function}}", function, -1)
+	t := newTag(name, content)
+	d.Tags = append(d.Tags, t)
+}
+
+func (d *datapack) addTickTag(function string) {
+	name := "tick"
+	content := strings.Replace(`{
+  "values": [
+    "{{function}}"
+  ]
+}
+`, "{{function}}", function, -1)
 	t := newTag(name, content)
 	d.Tags = append(d.Tags, t)
 }
@@ -69,10 +91,7 @@ func (d *datapack) createMCMeta() {
     "description": "{{ .Description }}"
   }
 }`
-	err := os.Mkdir("generated", 0755)
-	if err != nil {
-		fatal("Cannot create generated folder <%s>", err.Error())
-	}
+	mkdir("generated")
 
 	file, err := os.Create(filepath.Join("generated", "pack.mcmeta"))
 	if err != nil {

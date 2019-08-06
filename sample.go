@@ -1,7 +1,70 @@
 package main
 
-func newSample() *datapack {
-	dp := &datapack{
+import "fmt"
+
+const (
+	nsRoot         namespace = ""
+	nsGoHome       namespace = "sub/home/go"
+	nsTriggers     namespace = "sub/triggers"
+	nsVerification namespace = "sub/verification"
+)
+
+const (
+	funcNameLoop       functionName = "loop"
+	funcNameSetup      functionName = "setup"
+	funcNameValidation functionName = "validation"
+	funcNameSetHome    functionName = "set_home"
+	funcNameGoHome     functionName = "go_home"
+	funcNameHome       functionName = "home"
+	funcNameMove       functionName = "move"
+	funcNameError      functionName = "error"
+)
+
+const (
+	funcRefHome       functionRef = "true_home:sub/home/go/home"
+	funcRefMove       functionRef = "true_home:sub/home/go/move"
+	funcRefError      functionRef = "true_home:sub/home/go/error"
+	funcRefValidation functionRef = "true_home:sub/verification/validation"
+	funcRefTriggers   functionRef = "true_home:sub/triggers"
+)
+
+const (
+	obSetHome objective = "set_home"
+	obGoHome  objective = "go_home"
+	obHomeD   objective = "home_d"
+	obHomeX   objective = "home_x"
+	obHomeY   objective = "home_y"
+	obHomeZ   objective = "home_z"
+)
+
+var msgError = newMessageList(
+	message{Color: "green"},
+	message{Text: "You do not have a home set.", Color: "red"},
+	message{Word: "\n"},
+	message{Word: "Use "},
+	message{Text: "/trigger set_home", Color: "gold"},
+	message{Word: ", to set your home position."})
+
+var msgSetHome = newMessageList(
+	message{Text: "Your home has been set at", Color: "green"},
+	message{Word: ""},
+	message{Text: "", Color: "green"},
+	message{Word: ": "},
+	message{Word: `{"score":{"name":"@s","objective":"home_x"},"color":"gold"}`},
+	message{Word: `{"score":{"name":"@s","objective":"home_y"},"color":"gold"}`},
+	message{Word: ", "},
+	message{Word: `{"score":{"name":"@s","objective":"home_z"},"color":"gold"}`},
+	message{Word: `{"score":{"name":"@s","objective":"home_d"},"color":"gold"}`})
+
+var msgArrivedAtHome = newMessageList(
+	message{Word: ""},
+	message{Text: "You have arrived at your home.", Color: "green"})
+
+var triggerObjectives = []objective{obSetHome, obGoHome}
+var dummyObjectives = []objective{obHomeD, obHomeX, obHomeY, obHomeZ}
+
+func newSample() {
+	dp = &datapack{
 		Name:         "simple-home",
 		FunctionRoot: "true_home",
 		Version:      1,
@@ -9,88 +72,90 @@ func newSample() *datapack {
 		TargetPath:   "generated",
 	}
 
-	namespace := "sub/home/go"
-	dp.addFunction("error", namespace, `
-tellraw @s [{"text":"","color":"green"}, {"text":"You do not have a home set.","color":"red"}, "\n", "Use ", {"text":"/trigger set_home","color":"gold"}, ", to set your home position."]
-`)
+	sampleError()
+	sampleHome()
+	sampleMove()
+	sampleGoHome()
+	sampleSetHome()
+	sampleVerification()
+	sampleLoop()
+	sampleSetup()
 
-	dp.addFunction("home", namespace, `
-tag @s add home_player
-summon minecraft:armor_stand ~ ~ ~ {Tags:["home_pos"],Invisible:1b,Marker:1b}
-execute as @e[tag=home_pos,limit=1] run function true_home:sub/home/go/move
-execute at @s if score @s home_d matches 0 in minecraft:overworld run tp @s ~0.5 ~ ~0.5
-execute at @s if score @s home_d matches 1 in minecraft:the_end run tp @s ~0.5 ~ ~0.5
-execute at @s if score @s home_d matches -1 in minecraft:the_nether run tp @s ~0.5 ~ ~0.5
-tellraw @s ["", {"text":"You have arrived at your home.","color":"green"}]
-scoreboard players reset @s go_home
-tag @s remove home_player
-`)
+	dp.addLoadTag("true_home:setup")
+	dp.addTickTag("true_home:loop")
 
-	dp.addFunction("move", namespace, `
-execute store result entity @s Pos[0] double 1 run scoreboard players add @p[tag=home_player] home_x 0
-execute store result entity @s Pos[1] double 1 run scoreboard players add @p[tag=home_player] home_y 0
-execute store result entity @s Pos[2] double 1 run scoreboard players add @p[tag=home_player] home_z 0
-execute at @s run tp @p[tag=home_player] ~ ~ ~
-kill @s`)
-
-	namespace = "sub/triggers"
-
-	dp.addFunction("go_home", namespace, `
-execute unless entity @s[tag=has_home] run function true_home:sub/home/go/error
-execute if entity @s[tag=has_home] run function true_home:sub/home/go/home
-scoreboard players reset @s go_home
-`)
-
-	dp.addFunction("set_home", namespace, `
-execute store result score @s home_x run data get entity @s Pos[0]
-execute store result score @s home_y run data get entity @s Pos[1]
-execute store result score @s home_z run data get entity @s Pos[2]
-execute store result score @s home_d run data get entity @s Dimension
-scoreboard players reset @s set_home
-tag @s add has_home
-tellraw @s ["", {"text":"Your home has been set at","color":"green"}, ": ", {"score":{"name":"@s","objective":"home_x"},"color":"gold"}, ", ", {"score":{"name":"@s","objective":"home_y"},"color":"gold"}, ", ", {"score":{"name":"@s","objective":"home_z"},"color":"gold"}, "; ", {"score":{"name":"@s","objective":"home_d"},"color":"gold"}]
-`)
-
-	namespace = "sub/verification"
-
-	dp.addFunction("validation", namespace, `
-execute as @a[tag=has_home] unless score @s home_d matches ..0 unless score @s home_d matches 0.. run tag @s remove has_home
-execute as @a[tag=has_home] unless score @s home_x matches ..0 unless score @s home_x matches 0.. run tag @s remove has_home
-execute as @a[tag=has_home] unless score @s home_y matches ..0 unless score @s home_y matches 0.. run tag @s remove has_home
-execute as @a[tag=has_home] unless score @s home_z matches ..0 unless score @s home_z matches 0.. run tag @s remove has_home
-`)
-
-	namespace = ""
-
-	dp.addFunction("loop", namespace, `
-function true_home:sub/verification/validation
-function true_home:sub/triggers
-`)
-
-	dp.addFunction("setup", namespace, `
-scoreboard objectives add set_home trigger
-scoreboard objectives add go_home trigger
-scoreboard objectives add home_d dummy
-scoreboard objectives add home_x dummy
-scoreboard objectives add home_y dummy
-scoreboard objectives add home_z dummy
-`)
-
-	dp.addTag("load", `
-{
-  "values": [
-    "true_home:setup"
-  ]
+	dp.generate()
 }
-`)
 
-	dp.addTag("tick", `
-{
-  "values": [
-    "true_home:loop"
-  ]
+func sampleError() {
+	fc := dp.newFunction(funcNameError, nsGoHome).Content
+	fc.tellRaw(msgError)
 }
-`)
 
-	return dp
+func sampleHome() {
+	fc := dp.newFunction(funcNameHome, nsGoHome).Content
+	fc.addHomePlayer()
+	fc.addLine(`summon minecraft:armor_stand ~ ~ ~ {Tags:["home_pos"],Invisible:1b,Marker:1b}`)
+	fc.executeAs("@e[tag=home_pos,limit=1]", "run function true_home:sub/home/go/move")
+	fc.executeAt("@s", "if score @s home_d matches 0 in minecraft:overworld run tp @s ~0.5 ~ ~0.5")
+	fc.executeAt("@s", "if score @s home_d matches 1 in minecraft:the_end run tp @s ~0.5 ~ ~0.5")
+	fc.executeAt("@s", "if score @s home_d matches -1 in minecraft:the_nether run tp @s ~0.5 ~ ~0.5")
+	fc.tellRaw(msgArrivedAtHome)
+	fc.scoreReset("@s", obGoHome)
+	fc.removeHomePlayer()
+}
+
+func sampleMove() {
+	fc := dp.newFunction(funcNameMove, nsGoHome).Content
+	format := "result entity @s %s double 1 run scoreboard players add @p[tag=home_player] %s 0"
+	fc.executeStore(fmt.Sprintf(format, "Pos[0]", obHomeX))
+	fc.executeStore(fmt.Sprintf(format, "Pos[1]", obHomeY))
+	fc.executeStore(fmt.Sprintf(format, "Pos[2]", obHomeZ))
+	fc.executeAt("@s", "run tp @p[tag=home_player] ~ ~ ~")
+	fc.addLine(`kill @s`)
+
+}
+
+func sampleGoHome() {
+	fc := dp.newFunction(funcNameGoHome, nsTriggers).Content
+	fc.executeUnless("entity @s[tag=has_home] run function " + string(funcRefError))
+	fc.executeIf("entity @s[tag=has_home] run function " + string(funcRefHome))
+	fc.scoreReset("@s", obGoHome)
+
+}
+
+func sampleSetHome() {
+	fc := dp.newFunction(funcNameSetHome, nsTriggers).Content
+	executeStore := "result score @s %s run data get entity @s %s"
+	fc.executeStore(fmt.Sprintf(executeStore, obHomeX, "Pos[0]"))
+	fc.executeStore(fmt.Sprintf(executeStore, obHomeY, "Pos[1]"))
+	fc.executeStore(fmt.Sprintf(executeStore, obHomeZ, "Pos[2]"))
+	fc.executeStore(fmt.Sprintf(executeStore, obHomeD, "Dimension"))
+	fc.scoreReset("@s", obSetHome)
+	fc.addLine(`tag @s add has_home`)
+	fc.tellRaw(msgSetHome)
+}
+
+func sampleVerification() {
+	fc := dp.newFunction(funcNameValidation, nsVerification).Content
+	for _, ob := range []objective{obHomeD, obHomeX, obHomeY, obHomeZ} {
+		fc.executeAs("@a[tag=has_home]", fmt.Sprintf("unless score @s %s matches ..0 unless score @s %s matches 0.. run tag @s remove has_home", ob, ob))
+	}
+}
+
+func sampleLoop() {
+	fc := dp.newFunction(funcNameLoop, nsRoot).Content
+	fc.addFunctionRef(funcRefValidation)
+	fc.addFunctionRef(funcRefTriggers)
+}
+
+func sampleSetup() {
+	fc := dp.newFunction(funcNameSetup, nsRoot).Content
+	for _, ob := range triggerObjectives {
+		fc.addObjective(ob, criteriaTrigger, "")
+	}
+
+	for _, ob := range dummyObjectives {
+		fc.addObjective(ob, criteriaDummy, "")
+	}
 }

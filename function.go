@@ -1,30 +1,38 @@
 package main
 
 import (
-	"io/ioutil"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type function struct {
-	Name      string
-	Namespace string
-	Content   string
+	Name      functionName
+	Namespace namespace
+	Content   *functionContent
 }
 
-func newFunction(name string, namespace string, content string) *function {
+type functionContent struct {
+	Content bytes.Buffer
+}
+
+func newFunctionContent() *functionContent {
+	return &functionContent{Content: bytes.Buffer{}}
+}
+
+func newFunction(n functionName, ns namespace) *function {
 	return &function{
-		Name:      name,
-		Namespace: namespace,
-		Content:   content,
+		Name:      n,
+		Namespace: ns,
+		Content:   &functionContent{},
 	}
 }
 
 func (f *function) generate() {
 	var namespace string
 	if f.Namespace != "" {
-		parts := strings.Split(f.Namespace, "/")
+		parts := strings.Split(string(f.Namespace), "/")
 		namespace = filepath.Join(parts...)
 	}
 	functionFolder := filepath.Join(
@@ -38,5 +46,5 @@ func (f *function) generate() {
 		fatal("Cannot create function directory <%s>", err.Error())
 	}
 
-	ioutil.WriteFile(filepath.Join(functionFolder, f.Name+".mcfunction"), []byte(f.Content), 0644)
+	writeFile(filepath.Join(functionFolder, string(f.Name)+".mcfunction"), f.Content.Content.String())
 }

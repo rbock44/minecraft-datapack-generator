@@ -1,8 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
-	"os"
 	"path/filepath"
 )
 
@@ -17,12 +15,6 @@ func newTag(name, content string) *tag {
 
 func (t *tag) generate() {
 	tagFolder := filepath.Join("generated", "data", "minecraft", "tags", "functions")
-	err := os.MkdirAll(tagFolder, 0755)
-	if err != nil {
-		fatal("Cannot create tag folder <%s>", err.Error())
-	}
-	err = ioutil.WriteFile(filepath.Join(tagFolder, t.Name+".json"), []byte(t.Content), 0644)
-	if err != nil {
-		fatal("Cannot write tag file <%s>", err.Error())
-	}
+	mkdir(tagFolder)
+	writeFile(filepath.Join(tagFolder, t.Name+".json"), t.Content)
 }
